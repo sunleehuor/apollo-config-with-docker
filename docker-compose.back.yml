@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: mysql8-container
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: test # Ensure this matches the DB expected by Apollo Config Service
+      MYSQL_USER: root
+      MYSQL_PASSWORD: rootpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db_data:/var/lib/mysql
+
+  apollo-configService:
+      image: apolloconfig/apollo-configservice:latest
+      container_name: apollo-configservice
+      depends_on:
+        - db
+      ports:
+        - "8081:8080"
+      environment:
+        SPRING_DATASOURCE_URL: 'jdbc:mysql://db:3306/ApolloConfigDB?characterEncoding=utf8'
+        SPRING_DATASOURCE_USERNAME: 'root'
+        SPRING_DATASOURCE_PASSWORD: 'rootpassword'
+        APOLLO_PORTAL_ENVS: dev,pro
+      restart: always
+
+
+  apollo-portal:
+    image: apolloconfig/apollo-portal:latest
+    container_name: apollo-portal
+    depends_on:
+      - db
+      - apollo-configService
+    ports:
+      - "8087:8087"
+    environment:
+      SPRING_DATASOURCE_URL: 'jdbc:mysql://db:3306/ApolloPortalDB?characterEncoding=utf8'
+      SPRING_DATASOURCE_USERNAME: 'root'
+      SPRING_DATASOURCE_PASSWORD: 'rootpassword'
+      APOLLO_PORTAL_ENVS: dev,pro
+      DEV_META: http://172.18.0.4:8080
+      PRO_META: http://172.18.0.4:8080
+    restart: always
+
+  adminer:
+    image: adminer
+    container_name: adminer-container
+    restart: always
+    ports:
+      - "8080:8080"

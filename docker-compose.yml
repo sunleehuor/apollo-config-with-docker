@@ -1,0 +1,81 @@
+version: '3.9'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql8-container
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydatabase # Ensure this matches the DB expected by Apollo
+      MYSQL_USER: myuser
+      MYSQL_PASSWORD: mypassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db_data:/var/lib/mysql
+
+  apollo-configservice:
+    image: apolloconfig/apollo-configservice
+    container_name: apollo-configservice
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ApolloConfigDB?characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpassword
+      APOLLO_PORTAL_ENVS: dev,pro
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  apollo-adminservice:
+    image: apolloconfig/apollo-adminservice
+    container_name: apollo-adminservice
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ApolloConfigDB?characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpassword
+      EUREKA_SERVICE_URL: http://apollo-configservice:8080/eureka/
+    ports:
+      - "8090:8090"
+    depends_on:
+      - mysql
+      - apollo-configservice
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  apollo-portal:
+    image: apolloconfig/apollo-portal
+    container_name: apollo-portal
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ApolloPortalDB?characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpassword
+      DEV_META: http://apollo-configservice:8080
+      # Alternatively, for production use:
+      # PRO_META: http://apollo-configservice:8080
+    ports:
+      - "8070:8070"
+    depends_on:
+      - mysql
+      - apollo-configservice
+      - apollo-adminservice
+    restart: always
+    healthcheck:
+          test: ["CMD", "curl", "-f", "http://apollo-configservice:8080/health"]
+          interval: 10s
+          timeout: 5s
+          retries: 5
+
+volumes:
+  mysql_data:
